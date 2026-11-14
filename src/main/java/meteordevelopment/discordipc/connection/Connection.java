@@ -1,8 +1,8 @@
-package meteor.discordipc.connection;
+package meteordevelopment.discordipc.connection;
 
 import com.google.gson.JsonObject;
-import meteor.discordipc.Opcode;
-import meteor.discordipc.Packet;
+import meteordevelopment.discordipc.Opcode;
+import meteordevelopment.discordipc.Packet;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -23,7 +23,7 @@ public abstract class Connection {
         }
         return null;
     }
-    
+
     public static Connection open(Consumer<Packet> callback) {
         String os = System.getProperty("os.name").toLowerCase();
 
@@ -46,15 +46,28 @@ public abstract class Connection {
 
             if (path == null) path = "/tmp";
 
+            //default
             Path defaultIPCPath=Path.of(path);
-            //this is what the flatpak version of discord runs under
+            //this is what the flatpak version of discord runs under.
             Path flatpakIPCPath= defaultIPCPath.resolve("app/com.discordapp.Discord/");
+            //this is for the snap discord installation.
+            Path snapIPCPath= defaultIPCPath.resolve("snap.discord/");
+            //this is for Vesktop installations of discord.
+            Path vesktopIPCPath= defaultIPCPath.resolve("app/dev.vencord.Vesktop/");
 
-            //if running under flatpak
+            //flatpak
             if (Files.exists(flatpakIPCPath)) {
                 return tryAndReturnConnection(flatpakIPCPath, callback);
             }
-            //if running under the normal installation
+            //snap
+            else if (Files.exists(snapIPCPath)) {
+                return tryAndReturnConnection(snapIPCPath, callback);
+            }
+            //vesktop
+            else if (Files.exists(vesktopIPCPath)) {
+                return tryAndReturnConnection(vesktopIPCPath, callback);
+            }
+            //normal
             else if (Files.exists(defaultIPCPath)) {
                 return tryAndReturnConnection(defaultIPCPath, callback);
             }
