@@ -9,19 +9,26 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 public abstract class Connection {
     private final static String[] UNIX_TEMP_PATHS = { "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP" };
 
-    private static Connection tryAndReturnConnection(Path path, Consumer<Packet> callback) {
-        for (int i = 0; i < 10; i++) {
+    private static Connection getConnection(String type, Path path, Consumer<Packet> callback) {
+
+        AtomicReference<Connection> connection = new AtomicReference<>();
+
+        IntStream.range(0, 10).forEach(i->{
             try {
-                return new UnixConnection(path.resolve("discord-ipc-"+i).toString(), callback);
-            } catch (IOException ignored) {
-            }
-        }
-        return null;
+                if (type.contains("win"))
+                    connection.set(new WinConnection(path.resolve("discord-ipc-" + i).toString(), callback));
+                else connection.set(new UnixConnection(path.resolve("discord-ipc-" + i).toString(), callback));
+            } catch (IOException ignored) {}
+        });
+        
+        return connection.get();
     }
 
     public static Connection open(Consumer<Packet> callback) {
@@ -29,11 +36,7 @@ public abstract class Connection {
 
         // Windows
         if (os.contains("win")) {
-            for (int i = 0; i < 10; i++) {
-                try {
-                    return new WinConnection("\\\\.\\pipe\\discord-ipc-" + i, callback);
-                } catch (IOException ignored) {}
-            }
+            getConnection("win", Path.of("\\\\.\\pipe\\"), callback);
         }
         // Unix
         else {
@@ -57,19 +60,19 @@ public abstract class Connection {
 
             //flatpak
             if (Files.exists(flatpakIPCPath)) {
-                return tryAndReturnConnection(flatpakIPCPath, callback);
+                return getConnection("unix", flatpakIPCPath, callback);
             }
             //snap
             else if (Files.exists(snapIPCPath)) {
-                return tryAndReturnConnection(snapIPCPath, callback);
+                return getConnection("unix", snapIPCPath, callback);
             }
             //vesktop
             else if (Files.exists(vesktopIPCPath)) {
-                return tryAndReturnConnection(vesktopIPCPath, callback);
+                return getConnection("unix", vesktopIPCPath, callback);
             }
             //normal
             else if (Files.exists(defaultIPCPath)) {
-                return tryAndReturnConnection(defaultIPCPath, callback);
+                return getConnection("unix", defaultIPCPath, callback);
             }
         }
 
