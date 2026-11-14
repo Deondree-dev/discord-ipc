@@ -1,17 +1,29 @@
-package meteordevelopment.discordipc.connection;
+package meteor.discordipc.connection;
 
 import com.google.gson.JsonObject;
-import meteordevelopment.discordipc.Opcode;
-import meteordevelopment.discordipc.Packet;
+import meteor.discordipc.Opcode;
+import meteor.discordipc.Packet;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.Consumer;
 
 public abstract class Connection {
     private final static String[] UNIX_TEMP_PATHS = { "XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP" };
 
+    private static Connection tryAndReturnConnection(Path path, Consumer<Packet> callback) {
+        for (int i = 0; i < 10; i++) {
+            try {
+                return new UnixConnection(path.resolve("discord-ipc-"+i).toString(), callback);
+            } catch (IOException ignored) {
+            }
+        }
+        return null;
+    }
+    
     public static Connection open(Consumer<Packet> callback) {
         String os = System.getProperty("os.name").toLowerCase();
 
@@ -40,21 +52,11 @@ public abstract class Connection {
 
             //if running under flatpak
             if (Files.exists(flatpakIPCPath)) {
-                for (int i = 0; i < 10; i++) {
-                    try {
-                        return new UnixConnection(flatpakIPCPath.resolve("discord-ipc-"+i).toString(), callback);
-                    } catch (IOException ignored) {
-                    }
-                }
+                return tryAndReturnConnection(flatpakIPCPath, callback);
             }
             //if running under the normal installation
             else if (Files.exists(defaultIPCPath)) {
-                for (int i = 0; i < 10; i++) {
-                    try {
-                        return new UnixConnection(defaultIPCPath.resolve("discord-ipc-"+i).toString(), callback);
-                    } catch (IOException ignored) {
-                    }
-                }
+                return tryAndReturnConnection(defaultIPCPath, callback);
             }
         }
 
